@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LeVJEPA: Efficient &amp; Scalable Video Pretraining without the Heuristics</title>
+<meta name="description" content="LeVJEPA is the first video encoder trained under LeJEPA's collapse-free objective: one encoder, one loss, one hyperparameter.">
+<meta name="keywords" content="LeVJEPA, video, self-supervised, JEPA, SIGReg, block-causal, pretraining">
+
+<meta property="og:title" content="LeVJEPA: Efficient &amp; Scalable Video Pretraining without the Heuristics">
+<meta property="og:description" content="Matching V-JEPA 2 at 5.6-20.8x less pretraining compute, with block-causal frame representations at no accuracy cost.">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&family=Sora:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/computer-modern/cmu-serif.css">
+<link rel="stylesheet" href="./static/css/article.css?v=4">
+
+<script>window.MathJax = { tex: { inlineMath: [['\\(','\\)']], displayMath: [['$$','$$']] } };</script>
+<script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+</head>
+<body>
+
+<article class="article">
+
+  <!-- ===================== MASTHEAD ===================== -->
+  <header class="masthead full">
+    <h1>LeVJEPA: Efficient &amp; Scalable Video Pretraining<br>without the Heuristics</h1>
+
+    <div class="authors">
+      <div class="line">
+        <span class="a"><a href="https://lukas-kuhn.github.io">Lukas Kuhn</a><sup>1,2</sup></span>
+        <span class="a"><a href="https://lucas-maes.github.io/">Lucas Maes</a><sup>4,5</sup></span>
+        <span class="a"><a href="https://mlo-lab.github.io/author/giuseppe-serra/">Giuseppe Serra</a><sup>1</sup></span>
+        <span class="a"><a href="https://quentinll.github.io/">Quentin Le Lidec</a><sup>8</sup></span>
+      </div>
+      <div class="line">
+        <span class="a"><a href="http://yann.lecun.com/">Yann LeCun</a><sup>7,8</sup></span>
+        <span class="a"><a href="https://randallbalestriero.github.io">Randall Balestriero</a><sup>*,6,8</sup></span>
+        <span class="a"><a href="https://mlo-lab.github.io/author/florian-buettner/">Florian Buettner</a><sup>*,1,2,3</sup></span>
+      </div>
+    </div>
+
+    <div class="affil">
+      <div class="line">
+        <span class="u"><sup>1</sup>German Cancer Research Center</span>
+        <span class="u"><sup>2</sup>German Cancer Consortium</span>
+        <span class="u"><sup>3</sup>Goethe University Frankfurt</span>
+        <span class="u"><sup>4</sup>Mila</span>
+      </div>
+      <div class="line">
+        <span class="u"><sup>5</sup>Universit&eacute; de Montr&eacute;al</span>
+        <span class="u"><sup>6</sup>Brown University</span>
+        <span class="u"><sup>7</sup>Courant Institute, New York University</span>
+      </div>
+      <div class="line">
+        <span class="u"><sup>8</sup>Advanced Machine Intelligence (AMI Labs)</span>
+      </div>
+    </div>
+
+    <p class="contrib">
+      <sup>*</sup>Equal advising. &nbsp; Correspondence:
+      <a href="mailto:lukas.kuhn@dkfz-heidelberg.de"><code>lukas.kuhn@dkfz-heidelberg.de</code></a>
+    </p>
+
+    <div class="links">
+      <a class="btn btn-paper" href="https://arxiv.org/abs/2608.27395">Paper</a>
+      <a class="btn btn-code" href="https://github.com/galilai-group/levjepa">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.73.5.5 5.73.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.56v-2c-3.2.7-3.88-1.54-3.88-1.54-.53-1.34-1.29-1.7-1.29-1.7-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.71 1.26 3.37.96.1-.75.4-1.26.73-1.55-2.55-.29-5.23-1.28-5.23-5.68 0-1.25.45-2.28 1.19-3.08-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.8 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.12 3.05.74.8 1.18 1.83 1.18 3.08 0 4.41-2.68 5.38-5.24 5.67.41.35.78 1.05.78 2.12v3.14c0 .31.21.68.8.56A11.51 11.51 0 0 0 23.5 12C23.5 5.73 18.27.5 12 .5z"/></svg>
+        Code
+      </a>
+      <a class="btn btn-ckpt" href="https://huggingface.co/galilai-group/LeVJEPA-VideoMix-Large">Checkpoints</a>
+    </div>
+  </header>
+
+  <!-- ===================== SHOWCASE ===================== -->
+  <section class="showcase full">
+    <div class="showcase-grid">
+
+      <figure class="tile">
+        <div class="tile-stage" data-cmp>
+          <img src="./static/images/PCA/whippet_input.jpg" alt="Input frame of a whippet on a sofa.">
+          <img class="cmp-b" src="./static/images/PCA/whippet_pca.png" alt="Principal components of the patch tokens for the same frame.">
+          <div class="cmp-divider"></div>
+          <input class="cmp-range" type="range" min="0" max="100" value="50"
+                 aria-label="Reveal the patch-token decomposition, whippet">
+          <span class="tile-tag l">Input</span><span class="tile-tag r">PCA</span>
+        </div>
+        <figcaption>Whippet &middot; PCA</figcaption>
+      </figure>
+
+      <figure class="tile">
+        <div class="tile-stage" data-cmp>
+          <img src="./static/images/PCA/colorado_input.jpg" alt="Input frame of a Colorado landscape.">
+          <img class="cmp-b" src="./static/images/PCA/colorado_pca.png" alt="Principal components of the patch tokens for the same frame.">
+          <div class="cmp-divider"></div>
+          <input class="cmp-range" type="range" min="0" max="100" value="50"
+                 aria-label="Reveal the patch-token decomposition, Colorado">
+          <span class="tile-tag l">Input</span><span class="tile-tag r">PCA</span>
+        </div>
+        <figcaption>Colorado &middot; PCA</figcaption>
+      </figure>
+
+      
+      <figure class="tile">
+        <div class="tile-stage">
+          <video src="./static/videos/verstappen_short.mp4" autoplay loop muted playsinline
+                 preload="metadata"
+                 aria-label="Patch-token visualization of an onboard racing clip."></video>
+          <span class="tile-tag l">Video</span>
+        </div>
+        <figcaption>Verstappen</figcaption>
+      </figure>
+
+    </div>
+    <p class="caption">
+      <b>Patch-token structure of a frozen ViT-L.</b> Drag within either still to reveal the three leading
+      principal components of the patch-token representations, rendered as RGB; the clips show the corresponding
+      structure over time. Objects separate from their surroundings although the training objective supervises
+      only the clip-level <code>[cls]</code> token.
+    </p>
+  </section>
+
+  <!-- ===================== ABSTRACT ===================== -->
+  <section class="abstract full">
+    <h2>Abstract</h2>
+    <p>
+      Video provides an abundant, unannotated record of the temporal structure of the physical world, yet
+      self-supervised learning from it has remained computationally costly. Prevailing joint-embedding methods
+      preclude representation collapse through architectural asymmetry &mdash; an exponential-moving-average
+      target encoder, a stop-gradient, and a capacity-limited predictor &mdash; while masked-autoencoding methods
+      circumvent the question by reconstructing pixels through a dedicated decoder. We introduce
+      <strong>LeVJEPA</strong>, the first video encoder trained under the collapse-free objective of LeJEPA,
+      which requires neither. A single encoder is optimized with an invariance loss over global and local views
+      of a clip, regularized by SIGReg, which precludes collapse under a provable guarantee. The trainable
+      architecture reduces to an encoder and a projector, and the objective retains a single hyperparameter. At
+      matched epochs on identical data, LeVJEPA matches or exceeds V-JEPA&nbsp;2 across ViT-S/B/L at \(5.6\) to
+      \(20.8\times\) lower total pretraining compute; at matched FLOPs it exceeds the strongest video baseline by
+      \(7.6\) points on ImageNet-1K. Because no asymmetry between branches is required, the encoder admits
+      block-causal attention at no measurable cost in accuracy, such that each frame representation depends only
+      on past observations.
+    </p>
+  </section>
+
+  <!-- ===================== OBJECTIVE ===================== -->
+  <h2>Objective and architecture</h2>
+
+  <aside class="margin">
+    <p>Gradients propagate through both terms of \(\mathcal{L}_{\text{inv}}\): the target embedding is produced
+      by the same encoder in the same forward pass. No stop-gradient or target network is employed.</p>
+  </aside>
+
+  <aside class="margin">
+    <div class="tile-stage" data-cmp>
+      <img src="./static/images/PCA/washington_input.jpg" alt="Input frame of a Washington street scene.">
+      <img class="cmp-b" src="./static/images/PCA/washington_pca.png"
+           alt="Principal components of the patch tokens for the same frame.">
+      <div class="cmp-divider"></div>
+      <input class="cmp-range" type="range" min="0" max="100" value="50"
+             aria-label="Reveal the patch-token decomposition, Washington">
+      <span class="tile-tag l">Input</span><span class="tile-tag r">PCA</span>
+    </div>
+    <p>A street scene decomposed by the same encoder: buildings, roadway, vegetation and sky separate into
+      distinct components without any patch-level supervision.</p>
+  </aside>
+
+  <p>
+    From each video we sample a clip of \(16\) frames and construct \(V+1\) views: one global view at full
+    resolution and \(V\) local views obtained by spatial cropping and photometric augmentation, all sharing an
+    identical temporal window. Every view is processed by the same encoder \(E_\theta\); a learnable
+    <code>[cls]</code> token provides the clip-level readout, which a projector maps to an embedding
+    \(z_v \in \mathbb{R}^{K}\).
+  </p>
+
+  <p>
+    The training objective is \(\mathcal{L} = \mathcal{L}_{\text{inv}} + \lambda\,\mathcal{L}_{\text{SIGReg}}\).
+    The invariance term is the mean squared error between each local embedding and the global one; minimized in
+    isolation it admits the constant solution. SIGReg excludes that solution by constraining the embedding
+    distribution to an isotropic Gaussian, from which any collapsed configuration is maximally distant. By the
+    Cram&eacute;r&ndash;Wold theorem the constraint reduces to univariate goodness-of-fit tests along random
+    directions, evaluated with the Epps&ndash;Pulley statistic at cost linear in batch size and embedding
+    dimension.
+  </p>
+
+  <aside class="margin">
+    <p>\(\lambda = 0.02\) is the published LeJEPA default and is not tuned in any experiment reported here.</p>
+  </aside>
+
+
+  <p>
+    The trade-off weight \(\lambda\) constitutes the objective's only hyperparameter. The trainable architecture
+    comprises the encoder and projector alone; neither a predictor network nor a target encoder is instantiated.
+  </p>
+
+  <div class="full">
+    <figure>
+      <img src="./static/images/MainMethod.svg" data-fig
+           alt="LeVJEPA training: global and local views, uniform token dropping, a shared block-causal encoder, and the invariance and SIGReg objective.">
+      <figcaption>
+        <b>LeVJEPA training.</b> From each clip we construct one global view \((H \times W \times T)\) and
+        several local views \((h \times w \times T)\) sharing an identical temporal window. Within every view,
+        \(95\%\) of the patch tokens are discarded uniformly at random, and only the retained tokens enter the
+        sequence. Both views are processed by the same shared block-causal encoder \(E_\theta\), and the loss
+        reads only the <code>[cls]</code> embedding of each view.
+      </figcaption>
+    </figure>
+  </div>
+
+  <!-- ===================== TOKEN DROPPING ===================== -->
+  <h2>Token dropping</h2>
+
+  <aside class="margin">
+    <img src="./static/images/mask_ratio_vs_accuracy.svg" data-fig
+         alt="ImageNet-1K accuracy against the token masking ratio.">
+    <p>ImageNet-1K attentive-probing accuracy as a function of the masking ratio.</p>
+  </aside>
+
+  <p>
+    A fraction \(\rho\) of the patch tokens of each view is discarded uniformly at random after patch embedding,
+    and the retained tokens constitute the encoder's sole observation of the clip. Were this an approximation
+    adopted for efficiency, accuracy would be expected to decline as \(\rho\) increases. The converse is
+    observed: ImageNet-1K accuracy rises monotonically, from \(33.9\%\) at \(\rho = 0\) to \(47.6\%\) at
+    \(\rho = 0.95\).
+  </p>
+
+  <p>
+    Token dropping therefore fulfills two functions. It reduces the cost of each forward pass by a factor of up
+    to \((1-\rho)^{-1}\), and it constitutes a stochastic augmentation under which the clip-level embedding must
+    be inferable from a sparse, randomly located sample of the clip.
+  </p>
+
+  <div class="demo">
+    <span class="demo-kicker">Retained tokens across four frames of a clip</span>
+    <svg id="dropFig" viewBox="0 0 640 185" role="img"
+         aria-label="Four frames of a clip, each a 14 by 14 grid of patch tokens, with a controllable fraction discarded uniformly at random across the clip."></svg>
+    <div class="drop-controls">
+      <div class="slider-wrap">
+        <input type="range" id="dropRange" min="0" max="4" step="1" value="4"
+               aria-label="Token dropping ratio">
+        <div class="slider-ticks" id="dropTicks"></div>
+      </div>
+      <div class="drop-readout">
+        <span class="acc" id="dropAcc">47.6%</span>
+        <span class="acc-label">IN1K top-1<br><span id="dropTokens">39 of 784 tokens</span></span>
+      </div>
+    </div>
+  </div>
+
+  <aside class="margin">
+    <p>In masked prediction, structured masks are required to render imputation non-trivial. Under the present
+      objective no content is imputed, and a tube pattern instead occludes the same region of the scene in every
+      frame.</p>
+  </aside>
+
+  <p>
+    The spatial arrangement of the retained set is equally consequential. A tube variant retaining identical
+    spatial locations in every frame attains \(39.6\%\) against \(50.7\%\) for uniform random dropping, reversing
+    the ordering established in masked video modeling.
+  </p>
+
+  <aside class="margin">
+    <img src="./static/images/local_views_vs_accuracy.svg" data-fig
+         alt="ImageNet-1K accuracy against the number of local views.">
+    <p>Accuracy against the number of local views \(V\); saturation occurs at \(V = 10\). All comparisons
+      reported here use \(V = 4\).</p>
+  </aside>
+
+  <p>
+    Two further observations follow. Accuracy increases with the number of local views, from \(47.6\%\) at
+    \(V = 4\) to \(50.2\%\) at \(V = 10\), so the results reported below do not exhaust the method. Temporal
+    patch aggregation at the input, conventional in video transformers, proves unnecessary: at a matched token
+    budget, per-frame tokenization attains \(50.7\%\) against \(47.4\%\) on ImageNet-1K and \(30.4\%\) against
+    \(28.8\%\) on Something-Something-v2.
+  </p>
+
+  <!-- ===================== ATTENTION ===================== -->
+  <h2>Block-causal attention</h2>
+
+  <p>
+    Because the objective imposes no asymmetry between branches, the attention topology of the encoder is
+    unconstrained. We adopt a block-causal pattern in which patch tokens attend bidirectionally within their
+    frame and causally across frames, such that each frame representation is a function of the current and
+    preceding frames alone. Since causal masking removes future tokens from the receptive field of every token, a
+    reduction in representation quality might reasonably be anticipated. No such reduction is observed.
+  </p>
+
+  <div class="demo">
+    <span class="demo-kicker">Attention mask</span>
+    <svg id="attnFig" viewBox="0 0 640 380" role="img"
+         aria-label="Attention masks for bidirectional and block-causal topologies over four frames of four patch tokens each."></svg>
+    <div class="controls">
+      <button class="cbtn" id="attnBidi" type="button">Bidirectional</button>
+      <button class="cbtn is-active" id="attnCausal" type="button">Block-causal</button>
+      <span class="stage">Query &rarr; <b id="attnStage">current and past frames</b></span>
+    </div>
+  </div>
+
+  <aside class="margin">
+    <p>Since preceding frames need not be re-encoded as new frames arrive, the representation of a video extends
+      at constant incremental cost &mdash; a requirement of autoregressive world models and of streaming
+      inference.</p>
+  </aside>
+
+  <aside class="margin">
+    <video src="./static/videos/giraffe_short.mp4" autoplay loop muted playsinline preload="metadata"
+           aria-label="Patch-token structure of a frozen ViT-L over an eleven-second clip."></video>
+    <p>Patch-token structure of the frozen encoder over a longer clip. The decomposition remains stable frame to
+      frame although each frame representation is computed from past observations alone.</p>
+  </aside>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Attention</th><th>IN1K top-1</th></tr></thead>
+      <tbody>
+        <tr><td>Bidirectional</td><td>50.7</td></tr>
+        <tr class="ours"><td>Block-causal</td><td>51.2</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="table-cap">
+    Frozen attentive probe; both configurations use \(\tau = 1\), \(\rho = 0.95\), \(V = 4\), and uniform random
+    dropping.
+  </p>
+
+  <!-- ===================== PATCH-LEVEL ===================== -->
+  <h2>Patch-level representations</h2>
+
+
+  <aside class="margin">
+    <video src="./static/videos/racecar_short.mp4" autoplay loop muted playsinline preload="metadata"
+           aria-label="Cosine similarity between a query patch placed on the vehicle and all patch tokens, across frames."></video>
+    <p>Cosine similarity between a query patch placed on the vehicle and all patch tokens. High similarity stays
+      confined to the object as it moves, indicating representations that are spatially precise as well as
+      semantically organized.</p>
+  </aside>
+
+  <p>
+    The objective supervises the clip-level <code>[cls]</code> token exclusively; patch tokens receive no direct
+    supervision and no auxiliary dense loss is applied. Semantically organized patch representations nevertheless
+    emerge. V-JEPA&nbsp;2.1 obtains comparable structure through an explicitly introduced patch-level loss, and
+    V-JEPA&nbsp;2, trained without such a loss, exhibits no comparable token-level organization.
+  </p>
+
+  <p>
+    The same behavior holds under a query-based readout. Cosine similarity between a patch placed on an object
+    and all remaining patch tokens stays confined to that object rather than diffusing across the frame,
+    indicating representations that are spatially precise as well as semantically grouped.
+  </p>
+
+  <p>
+    Because the encoder is block-causal, these maps are computed from the current and preceding frames alone,
+    so the correspondence they express is maintained as the scene moves rather than recovered by attending
+    forward in time.
+  </p>
+
+  <!-- ===================== COMPARISON ===================== -->
+  <h2>Empirical comparison</h2>
+
+  <p>
+    To eliminate confounds in pretraining data, schedule, and compute, all baselines are retrained on an
+    identical \(20\%\) subsample of K710 using their official implementations, for \(240\) epochs at an effective
+    batch size of \(3{,}072\), with every encoder probed on an equal number of tokens.
+  </p>
+
+  <figure class="body-figure">
+      <img class="chart" src="./static/images/imagenet_scaling.svg" data-fig
+           alt="ImageNet-1K accuracy against total pretraining compute for ViT-S, ViT-B and ViT-L encoders.">
+      <figcaption>
+        <b>Accuracy against total pretraining compute at matched epochs.</b> ImageNet-1K attentive-probing
+        accuracy of ViT-S, ViT-B, and ViT-L encoders pretrained for \(240\) epochs on an identical \(20\%\)
+        subsample of K710. Marker size indicates model size; the horizontal axis is logarithmic and reversed.
+      </figcaption>
+  </figure>
+
+  <aside class="margin">
+    <p>At ViT-L the margin is \(1.9\) points in favor of LeVJEPA at \(5.6\times\) lower cost; that encoder
+      consumes less than half the compute of the V-JEPA&nbsp;2 ViT-S.</p>
+  </aside>
+
+  <p>
+    Across all three encoder sizes LeVJEPA attains accuracy comparable to or exceeding V-JEPA&nbsp;2 at a
+    fraction of the total pretraining compute, the advantage ranging from \(5.6\times\) at ViT-L to
+    \(20.8\times\) at ViT-S. At ViT-B the two methods are separated by less than one accuracy point, at \(4.8\)
+    against \(36.4\) ExaFLOPs. Under a fixed total FLOP budget, the reduced per-sample cost admits a
+    proportionally longer schedule of \(1{,}085\) epochs at \(V = 10\).
+  </p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Method</th><th>IN1K</th><th>SSv2</th><th>K400</th></tr></thead>
+      <tbody>
+        <tr><td>VideoMAEv2</td><td>53.4</td><td><span class="best">43.6</span></td><td>37.4</td></tr>
+        <tr><td>V-JEPA&nbsp;2</td><td>51.6</td><td>42.5</td><td>40.7</td></tr>
+        <tr class="ours"><td>LeVJEPA</td><td>61.0</td><td>40.4</td><td>44.6</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="table-cap">
+    ViT-B encoders at equal total pretraining FLOPs, evaluated frozen. IN1K and SSv2 report attentive-probing
+    top-1 accuracy; K400 reports linear probing on mean-pooled tokens, a strictly weaker adaptation.
+  </p>
+
+  <h3>Comparison with image pretraining</h3>
+
+  <aside class="margin">
+    <p>Video contains the appearance information of its constituent frames and additionally supplies temporal
+      structure; the choice between paradigms may therefore be governed by data availability rather than by
+      computational cost.</p>
+  </aside>
+
+  <p>
+    Image-based self-supervised learning has hitherto constituted the stronger paradigm for appearance-centric
+    transfer. Training DINOv2 with its official implementation on individual frames of the same video data
+    (\(11.7\)M frame samples over \(11{,}400\) optimizer steps) at equal total FLOPs, the image-pretrained
+    encoder retains an advantage of \(3.1\) points on ImageNet-1K, while the video-pretrained encoder attains
+    nearly twice its accuracy on Something-Something-v2.
+  </p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Method</th><th>IN1K</th><th>SSv2</th></tr></thead>
+      <tbody>
+        <tr><td>DINOv2</td><td><span class="best">53.8</span></td><td>16.9</td></tr>
+        <tr class="ours"><td>LeVJEPA</td><td>50.7</td><td>30.4</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="table-cap">
+    ViT-B encoders at equal total FLOPs on identical source data; frozen attentive probes.
+  </p>
+
+  <!-- ===================== REQUIREMENTS AND SCALING ===================== -->
+  <h2>Computational requirements and data scaling</h2>
+
+  <aside class="margin">
+    <p>On a \(16\)&nbsp;GB device LeVJEPA trains at batch size \(128\) within \(8\)&nbsp;GB, whereas a V-JEPA
+      configuration with an identically sized encoder saturates the device at batch size \(28\).</p>
+  </aside>
+
+  <p>
+    The reduced per-sample cost lowers the hardware threshold for pretraining. A ViT-Tiny trained for \(12\)
+    hours on a single consumer GPU on eight unannotated Walking Tours videos, approximately \(620\)k frames,
+    improves from \(8.9\%\) to \(25.2\%\) ImageNet-1K top-1 under frozen evaluation.
+  </p>
+
+  <p>
+    Relaxing the \(20\%\) restriction, a ViT-L/16 pretrained for \(100\) epochs on the union of K710,
+    Something-Something-v2, Walking Tours, and the PE Video Dataset attains \(67.5\%\) on ImageNet-1K and
+    \(55.0\%\) on Something-Something-v2 under frozen attentive probing, within a shorter schedule and without
+    modification to the objective or its single hyperparameter.
+  </p>
+
+  <!-- ===================== CITATION ===================== -->
+  <h2>Cite</h2>
+
+  <div class="bibtex">
+<pre>@misc{kuhn2026levjepaefficientscalable,
+      title={LeVJEPA: Efficient &amp; Scalable Video Pretraining without the Heuristics}, 
+      author={Lukas Kuhn and Lucas Maes and Giuseppe Serra and Quentin Le Lidec and Yann LeCun and Randall Balestriero and Florian Buettner},
+      year={2026},
+      eprint={2608.27395},
+      archivePrefix={arXiv},
+      primaryClass={cs.CV},
+      url={https://arxiv.org/abs/2608.27395}, 
+}</pre>
+  </div>
+
+  <!-- ===================== FOOTER ===================== -->
+  <footer class="full">
+    <h3>Acknowledgements</h3>
+    <p>
+      We gratefully acknowledge support from the hessian.AI Service Center (funded by the Federal Ministry of
+      Research, Technology and Space, BMFTR, grant no. 16IS22091) and the hessian.AI Innovation Lab (funded by
+      the Hessian Ministry for Digital Strategy and Innovation, grant no. S-DIW04/0013/003).
+    </p>
+    <p>
+      This work was co-funded by the European Union (ERC, TAIPO, 101088594 to F.B.) grant. Views and opinions
+      expressed are those of the authors only and do not necessarily reflect those of the European Union or ERC.
+      Neither the European Union nor the granting authority can be held responsible for them.
+    </p>
+    <p>Correspondence: <a href="mailto:lukas.kuhn@dkfz-heidelberg.de">lukas.kuhn@dkfz-heidelberg.de</a></p>
+  </footer>
+
+</article>
+
+<script src="./static/js/figures.js?v=8"></script>
+</body>
+</html>
